@@ -7,12 +7,6 @@ class Plan extends Model {
         title: Sequelize.STRING,
         duration: Sequelize.INTEGER,
         price: Sequelize.FLOAT,
-        total: {
-          type: Sequelize.VIRTUAL,
-          get() {
-            return this.price * this.duration;
-          },
-        },
       },
       {
         sequelize,
