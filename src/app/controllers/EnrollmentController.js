@@ -4,7 +4,8 @@ import { pt } from 'date-fns/locale';
 import Enrollment from '../models/Enrollment';
 import Student from '../models/Student';
 import Plan from '../models/Plan';
-import Mail from '../../lib/Mail';
+import Queue from '../../lib/Queue';
+import EnrollmentMail from '../jobs/EnrollmentMail';
 
 class EnrollmentController {
   async index(req, res) {
@@ -51,51 +52,40 @@ class EnrollmentController {
     });
 
     if (enrollmentExists) {
-      res.status(400).json({ error: 'Enrollment already exists' });
+      return res.status(400).json({ error: 'Enrollment already exists' });
     }
 
     // verificar se o aluno existe
     const studentExists = await Student.findOne({ where: { id: student_id } });
 
     if (!studentExists) {
-      res.status(401).json({ error: 'Student does not exists' });
+      return res.status(401).json({ error: 'Student does not exists' });
     }
 
     // verificar se o plano existe
     const planExists = await Plan.findOne({ where: { id: plan_id } });
     if (!planExists) {
-      res.status(401).json({ error: 'Plan does not exists' });
+      return res.status(401).json({ error: 'Plan does not exists' });
     }
 
+    const plan = await Plan.findByPk(plan_id);
+    const student = await Student.findByPk(student_id);
     // calcular a data de termino e o preço
-    const { id, end_date, price } = await Enrollment.create({
+    const enrollment = await Enrollment.create({
       plan_id,
       student_id,
       start_date,
-      end_date: addMonths(parseISO(start_date), planExists.duration),
-      price: planExists.price * planExists.duration,
+      end_date: addMonths(parseISO(start_date), plan.duration),
+      price: plan.price * plan.duration,
     });
 
-    await Mail.sendMail({
-      to: `${studentExists.name} <${studentExists.email}>`,
-      subject: 'Matrícula realizada',
-      template: 'enrollments',
-      context: {
-        student: studentExists.name,
-        plan: planExists.title,
-        end_date: format(end_date, 'dd/MM/yyyy', { locale: pt }),
-        total: price,
-      },
+    await Queue.add(EnrollmentMail.key, {
+      enrollment,
+      plan,
+      student,
     });
 
-    return res.json({
-      id,
-      student_id,
-      plan_id,
-      start_date,
-      end_date,
-      price,
-    });
+    return res.json(enrollment);
   }
 
   async update(req, res) {
@@ -118,7 +108,7 @@ class EnrollmentController {
     const enrollment = await Enrollment.findByPk(req.params.id);
 
     if (!enrollment) {
-      res.status(401).json({ error: 'Enrollment does not exists' });
+      return res.status(401).json({ error: 'Enrollment does not exists' });
     }
 
     if (plan_id !== enrollment.plan_id) {
@@ -127,7 +117,7 @@ class EnrollmentController {
       });
 
       if (!planExists) {
-        res.status(401).json({ error: 'Plan does not exists' });
+        return res.status(401).json({ error: 'Plan does not exists' });
       }
     }
 
@@ -137,7 +127,7 @@ class EnrollmentController {
       });
 
       if (!studentExists) {
-        res.status(401).json({ error: 'Student does not exists' });
+        return res.status(401).json({ error: 'Student does not exists' });
       }
     }
 
@@ -152,16 +142,10 @@ class EnrollmentController {
       price: plan.price * plan.duration,
     });
 
-    await Mail.sendMail({
-      to: `${student.name} <${student.email}>`,
-      subject: 'Matrícula atualizada',
-      template: 'enrollmentsUpdate',
-      context: {
-        student: student.name,
-        plan: plan.title,
-        end_date: format(end_date, 'dd/MM/yyyy', { locale: pt }),
-        total: price,
-      },
+    await Queue.add(EnrollmentMail.key, {
+      enrollment,
+      plan,
+      student,
     });
 
     return res.json({
@@ -183,7 +167,7 @@ class EnrollmentController {
 
     await enrollment.destroy();
 
-    res.json({});
+    return res.json({});
   }
 }
 
