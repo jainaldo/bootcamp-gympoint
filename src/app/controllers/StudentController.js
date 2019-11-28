@@ -96,6 +96,35 @@ class StudentController {
       height,
     });
   }
+
+  async show(req, res) {
+    const student = await Student.findByPk(req.params.id);
+
+    if (!student) {
+      return res.status(401).json({ error: 'Student does not exists.' });
+    }
+
+    return res.json({
+      id: student.id,
+      name: student.name,
+      email: student.email,
+      age: student.age,
+      weight: student.weight,
+      height: student.height,
+    });
+  }
+
+  async delete(req, res) {
+    const student = await Student.findByPk(req.params.id);
+
+    if (!student) {
+      return res.status(401).json({ error: 'student does not exists' });
+    }
+
+    await student.destroy();
+
+    return res.json();
+  }
 }
 
 export default new StudentController();

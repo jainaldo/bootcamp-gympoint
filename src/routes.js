@@ -29,7 +29,9 @@ routes.put('/users', UserController.update);
 
 routes.get('/students', StudentController.index);
 routes.post('/students', StudentController.store);
+routes.get('/students/:id', StudentController.show);
 routes.put('/students/:id', StudentController.update);
+routes.delete('/students/:id', StudentController.delete);
 
 routes.put('/help-orders/:id/answer', HelpOrderController.update);
 
